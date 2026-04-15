@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/)",
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "Bash(curl -s \"https://cdn.jsdelivr.net/gh/ffxiv-teamcraft/ffxiv-teamcraft@staging/libs/data/src/lib/json/recipes.json\")",
+      "Bash(npx tsc:*)",
+      "Bash(curl -s \"https://universalis.app/api/v2/history/meteor/5056?entriesWithin=604800&entriesToReturn=10\")",
+      "Bash(curl -s \"https://universalis.app/api/v2/meteor/5056\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if k != 'listings' and k != 'recentHistory'}, indent=2\\)\\)\")",
+      "Bash(curl -s \"https://universalis.app/api/v2/history/meteor/5056?entriesWithin=604800&entriesToReturn=100\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); entries=d.get\\('entries',[]\\); print\\('entries count:', len\\(entries\\)\\); [print\\(e['timestamp'], e['pricePerUnit'], 'HQ' if e['hq'] else 'NQ'\\) for e in entries[:5]]\")",
+      "Bash(node -e ':*)",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}
