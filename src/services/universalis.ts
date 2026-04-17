@@ -65,9 +65,13 @@ export async function fetchPrice(itemId: number): Promise<UniversalisItem> {
 
 // ── History fetch ──────────────────────────────────────────────────────────
 
+// 常に30日分取得し、クライアント側で期間フィルタ
+const HISTORY_FETCH_DAYS = 30
+
 export async function fetchHistory(itemId: number): Promise<HistoryEntry[]> {
+  const entriesWithin = HISTORY_FETCH_DAYS * 86400
   const res = await fetch(
-    `${BASE}/history/${WORLD}/${itemId}?entriesWithin=604800&entriesToReturn=99999`
+    `${BASE}/history/${WORLD}/${itemId}?entriesWithin=${entriesWithin}&entriesToReturn=99999`
   )
   if (!res.ok) throw new Error(`History API error: ${res.status}`)
   const json = (await res.json()) as UniversalisHistory

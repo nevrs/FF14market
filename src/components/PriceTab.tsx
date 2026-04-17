@@ -1,19 +1,40 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { ItemsMap } from '../types'
 import { SearchInput } from './SearchInput'
 import { DailyChart } from './DailyChart'
 import { Spinner } from './Spinner'
 import { usePrice } from '../hooks/usePrice'
-import { formatGil } from '../utils/calculations'
+import { calculateDailyStatistics, calculateDailyVolume, formatGil } from '../utils/calculations'
 
 interface PriceTabProps {
   items: ItemsMap | null
   itemsLoading: boolean
 }
 
+const DAY_OPTIONS = [7, 14, 30] as const
+type DayOption = typeof DAY_OPTIONS[number]
+
 export function PriceTab({ items, itemsLoading }: PriceTabProps) {
   const [selectedName, setSelectedName] = useState('')
-  const { item, dailyStats, dailyVolume, loading, error, load } = usePrice()
+  const [chartDays, setChartDays] = useState<DayOption>(7)
+  const [chartHQ, setChartHQ] = useState(true) // デフォルトHQ
+
+  const { item, history, dailyVolume, loading, error, load } = usePrice()
+
+  // HQ履歴があるか判定
+  const hasHQHistory = useMemo(() => history.some((e) => e.hq), [history])
+
+  // HQデータが無ければ自動でNQへ切り替え
+  useEffect(() => {
+    if (history.length > 0 && !hasHQHistory) setChartHQ(false)
+    if (hasHQHistory) setChartHQ(true)
+  }, [hasHQHistory, history.length])
+
+  // 期間・NQ/HQフィルタを適用して日別統計を計算（再フェッチ不要）
+  const dailyStats = useMemo(
+    () => calculateDailyStatistics(history, chartDays, hasHQHistory ? chartHQ : false),
+    [history, chartDays, chartHQ, hasHQHistory]
+  )
 
   function handleSelect(id: string, name: string) {
     setSelectedName(name)
@@ -33,7 +54,6 @@ export function PriceTab({ items, itemsLoading }: PriceTabProps) {
         />
       </div>
 
-      {/* Loading */}
       {loading && (
         <div className="card flex items-center justify-center gap-3 py-10">
           <Spinner />
@@ -41,14 +61,12 @@ export function PriceTab({ items, itemsLoading }: PriceTabProps) {
         </div>
       )}
 
-      {/* Error */}
       {error && (
         <div className="card border-red-800 bg-red-900/20 text-red-400 text-sm">
           エラー: {error}
         </div>
       )}
 
-      {/* Results */}
       {!loading && item && (
         <>
           <h2 className="text-base font-bold text-white px-1">{selectedName}</h2>
@@ -71,9 +89,52 @@ export function PriceTab({ items, itemsLoading }: PriceTabProps) {
 
           {/* Daily chart */}
           <div className="card">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-              過去7日 日別価格推移
-            </h3>
+            {/* チャートヘッダー: タイトル + コントロール */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                日別価格推移
+              </h3>
+              <div className="flex items-center gap-2">
+                {/* NQ/HQ トグル（HQデータがある場合のみ表示） */}
+                {hasHQHistory && (
+                  <div className="flex items-center gap-0.5 bg-gray-700 rounded-lg p-0.5">
+                    <button
+                      onClick={() => setChartHQ(false)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors
+                        ${!chartHQ ? 'bg-gray-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      NQ
+                    </button>
+                    <button
+                      onClick={() => setChartHQ(true)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors
+                        ${chartHQ ? 'bg-yellow-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      HQ
+                    </button>
+                  </div>
+                )}
+                {/* 期間セレクタ */}
+                <div className="flex items-center gap-0.5 bg-gray-700 rounded-lg p-0.5">
+                  {DAY_OPTIONS.map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setChartDays(d)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors
+                        ${chartDays === d ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      {d}日
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* HQデータなしの場合の注記 */}
+            {hasHQHistory === false && (
+              <p className="text-xs text-gray-500 mb-2">HQ取引履歴なし — NQを表示中</p>
+            )}
+
             <DailyChart data={dailyStats} />
           </div>
 
@@ -98,16 +159,9 @@ export function PriceTab({ items, itemsLoading }: PriceTabProps) {
                     .sort((a, b) => a.pricePerUnit - b.pricePerUnit)
                     .slice(0, 15)
                     .map((listing, i) => (
-                      <tr
-                        key={i}
-                        className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors"
-                      >
+                      <tr key={i} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
                         <td className="py-1.5 pr-4">
-                          {listing.hq ? (
-                            <span className="badge-hq">HQ</span>
-                          ) : (
-                            <span className="badge-nq">NQ</span>
-                          )}
+                          {listing.hq ? <span className="badge-hq">HQ</span> : <span className="badge-nq">NQ</span>}
                         </td>
                         <td className="text-right pr-4 font-mono text-yellow-300">
                           {listing.pricePerUnit.toLocaleString()}
@@ -130,23 +184,11 @@ export function PriceTab({ items, itemsLoading }: PriceTabProps) {
   )
 }
 
-function StatCard({
-  label,
-  quality,
-  value,
-}: {
-  label: string
-  quality: 'NQ' | 'HQ'
-  value: string
-}) {
+function StatCard({ label, quality, value }: { label: string; quality: 'NQ' | 'HQ'; value: string }) {
   return (
     <div className="card flex flex-col gap-1">
       <div className="flex items-center gap-1.5">
-        {quality === 'NQ' ? (
-          <span className="badge-nq">NQ</span>
-        ) : (
-          <span className="badge-hq">HQ</span>
-        )}
+        {quality === 'NQ' ? <span className="badge-nq">NQ</span> : <span className="badge-hq">HQ</span>}
         <span className="stat-label">{label}</span>
       </div>
       <span className="stat-value text-yellow-300">{value}</span>

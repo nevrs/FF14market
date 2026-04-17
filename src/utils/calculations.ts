@@ -17,10 +17,22 @@ function toDateString(ts: number): string {
  * GAS: calculateDailyStatistics
  * 履歴エントリを日別に集計し、安値・高値・取引量を返す（直近7日分）
  */
-export function calculateDailyStatistics(entries: HistoryEntry[]): DailyStat[] {
+/**
+ * @param entries  履歴エントリ
+ * @param days     集計日数（デフォルト7）
+ * @param filterHQ undefined=全件 / true=HQのみ / false=NQのみ
+ */
+export function calculateDailyStatistics(
+  entries: HistoryEntry[],
+  days = 7,
+  filterHQ?: boolean
+): DailyStat[] {
+  const cutoff = Date.now() / 1000 - days * 86400
   const byDate = new Map<string, { prices: number[]; volume: number }>()
 
   for (const e of entries) {
+    if (e.timestamp < cutoff) continue
+    if (filterHQ !== undefined && e.hq !== filterHQ) continue
     const date = toDateString(e.timestamp)
     if (!byDate.has(date)) byDate.set(date, { prices: [], volume: 0 })
     const day = byDate.get(date)!
@@ -38,9 +50,8 @@ export function calculateDailyStatistics(entries: HistoryEntry[]): DailyStat[] {
     })
   }
 
-  // Sort descending, keep last 7 days, then return ascending for chart
-  stats.sort((a, b) => b.date.localeCompare(a.date))
-  return stats.slice(0, 7).reverse()
+  stats.sort((a, b) => a.date.localeCompare(b.date))
+  return stats
 }
 
 /**
