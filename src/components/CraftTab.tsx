@@ -63,8 +63,13 @@ export function CraftTab({ items, itemsLoading }: CraftTabProps) {
   const sellNQ = finishedItem ? (finishedItem.minPriceNQ || finishedItem.minPrice || 0) : 0
   const sellHQ = finishedItem ? (finishedItem.minPriceHQ || 0) : 0
 
-  const profitNQmat = costResult && sellNQ ? sellNQ - costResult.totalNQCost : null
-  const profitHQmat = costResult && sellNQ ? sellNQ - costResult.totalHQCost : null
+  // 2×2: 素材NQ/HQ × 完成品NQ/HQ
+  const profit = (sell: number, cost: number) =>
+    sell > 0 && costResult ? sell - cost : null
+  const p_nqMat_nqSell = costResult ? profit(sellNQ, costResult.totalNQCost) : null
+  const p_nqMat_hqSell = costResult ? profit(sellHQ, costResult.totalNQCost) : null
+  const p_hqMat_nqSell = costResult ? profit(sellNQ, costResult.totalHQCost) : null
+  const p_hqMat_hqSell = costResult ? profit(sellHQ, costResult.totalHQCost) : null
 
   const loading = recipesLoading || pricesLoading
   const error = recipesError || pricesError
@@ -125,41 +130,58 @@ export function CraftTab({ items, itemsLoading }: CraftTabProps) {
             </p>
           </div>
 
-          {/* 売値 */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="card">
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="badge-nq">NQ</span>
-                <span className="stat-label">完成品 最安値</span>
-              </div>
-              <span className="stat-value text-yellow-300">{formatGil(sellNQ)}</span>
-            </div>
-            <div className="card">
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="badge-hq">HQ</span>
-                <span className="stat-label">完成品 最安値</span>
-              </div>
-              <span className="stat-value text-yellow-300">{formatGil(sellHQ)}</span>
-            </div>
-          </div>
-
-          {/* 粗利益サマリー */}
-          <div className="card">
+          {/* 粗利益 2×2 マトリクス */}
+          <div className="card overflow-x-auto">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-              予想粗利益（完成品NQ売値 − 素材コスト / 個）
+              予想粗利益（完成品最安値 − 素材コスト / 個）
             </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <ProfitBlock
-                label="全NQ素材で制作"
-                cost={costResult.totalNQCost}
-                profit={profitNQmat}
-              />
-              <ProfitBlock
-                label="全HQ素材で制作"
-                cost={costResult.totalHQCost}
-                profit={profitHQmat}
-              />
-            </div>
+            <table className="w-full text-sm min-w-[320px]">
+              <thead>
+                <tr className="text-xs text-gray-400 border-b border-gray-700">
+                  <th className="text-left pb-2 pr-4">素材コスト</th>
+                  <th className="text-right pb-2 pr-4">
+                    <span className="badge-nq">NQ</span> 完成品売値
+                  </th>
+                  <th className="text-right pb-2">
+                    <span className="badge-hq">HQ</span> 完成品売値
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* 完成品売値ヘッダー行 */}
+                <tr className="border-b border-gray-700/30 text-xs text-gray-500">
+                  <td className="py-1 pr-4">最安値</td>
+                  <td className="text-right pr-4 font-mono text-yellow-400">{formatGil(sellNQ)}</td>
+                  <td className="text-right font-mono text-yellow-400">{formatGil(sellHQ)}</td>
+                </tr>
+                {/* 全NQ素材行 */}
+                <tr className="border-b border-gray-700/30">
+                  <td className="py-2.5 pr-4">
+                    <div className="text-xs text-gray-400">全<span className="badge-nq mx-1">NQ</span>素材</div>
+                    <div className="font-mono text-red-400 text-xs mt-0.5">{formatGil(costResult.totalNQCost)}</div>
+                  </td>
+                  <td className="text-right pr-4">
+                    <ProfitValue value={p_nqMat_nqSell} />
+                  </td>
+                  <td className="text-right">
+                    <ProfitValue value={p_nqMat_hqSell} />
+                  </td>
+                </tr>
+                {/* 全HQ素材行 */}
+                <tr>
+                  <td className="py-2.5 pr-4">
+                    <div className="text-xs text-gray-400">全<span className="badge-hq mx-1">HQ</span>素材</div>
+                    <div className="font-mono text-red-400 text-xs mt-0.5">{formatGil(costResult.totalHQCost)}</div>
+                  </td>
+                  <td className="text-right pr-4">
+                    <ProfitValue value={p_hqMat_nqSell} />
+                  </td>
+                  <td className="text-right">
+                    <ProfitValue value={p_hqMat_hqSell} />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           {/* 素材テーブル */}
@@ -236,31 +258,12 @@ export function CraftTab({ items, itemsLoading }: CraftTabProps) {
   )
 }
 
-function ProfitBlock({
-  label,
-  cost,
-  profit,
-}: {
-  label: string
-  cost: number
-  profit: number | null
-}) {
-  const isProfit = profit !== null && profit >= 0
+function ProfitValue({ value }: { value: number | null }) {
+  if (value === null) return <span className="text-gray-600 font-mono text-sm">—</span>
+  const isPositive = value >= 0
   return (
-    <div className="space-y-1.5">
-      <p className="text-xs text-gray-400">{label}</p>
-      <div className="flex items-baseline gap-2">
-        <span className="text-xs text-gray-500">コスト</span>
-        <span className="font-mono text-red-400 font-semibold">{formatGil(cost)}</span>
-      </div>
-      <div className="flex items-baseline gap-2">
-        <span className="text-xs text-gray-500">粗利益</span>
-        <span className={`font-mono font-bold text-lg ${isProfit ? 'text-green-400' : 'text-red-400'}`}>
-          {profit !== null
-            ? `${profit >= 0 ? '+' : ''}${Math.round(profit).toLocaleString('ja-JP')} G`
-            : '—'}
-        </span>
-      </div>
-    </div>
+    <span className={`font-mono font-semibold text-sm ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+      {isPositive ? '+' : ''}{Math.round(value).toLocaleString('ja-JP')} G
+    </span>
   )
 }
