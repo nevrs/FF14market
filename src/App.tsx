@@ -84,7 +84,7 @@ export default function App() {
           価格データ: <a href="https://universalis.app" target="_blank" rel="noopener noreferrer" className="hover:text-gray-400 underline">Universalis</a>
           　アイテムDB: <a href="https://ffxivteamcraft.com" target="_blank" rel="noopener noreferrer" className="hover:text-gray-400 underline">FFXIV Teamcraft</a>
         </div>
-        <div className="text-gray-700">v0.3.0 — 2026-04-17</div>
+        <div className="text-gray-700">v0.4.0 — 2026-04-17</div>
       </footer>
     </div>
   )
